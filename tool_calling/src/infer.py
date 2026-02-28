@@ -45,6 +45,7 @@ def main():
   else:
     model = AutoModelForCausalLM.from_pretrained(args.ckpt)
 
+  model.config.pad_token_id = tokenizer.pad_token_id
   model.eval()
   if torch.cuda.is_available():
     model = model.to("cuda")
