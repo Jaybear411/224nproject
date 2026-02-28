@@ -80,6 +80,7 @@ def main():
       model_kwargs["device_map"] = "auto"
     except ImportError:
       use_qlora = False
+      print("Warning: peft/bitsandbytes not found. Falling back to standard full-precision fine-tuning.")
 
   model = AutoModelForCausalLM.from_pretrained(model_name, **model_kwargs)
   if use_qlora:
@@ -122,7 +123,9 @@ def main():
 
   trainer = Trainer(model=model, args=training_args, train_dataset=train_ds)
   trainer.train()
-  trainer.save_model(str(ckpt_dir / "final"))
+  final_dir = ckpt_dir / "final"
+  trainer.save_model(str(final_dir))
+  tokenizer.save_pretrained(str(final_dir))
 
   with (run_dir / "run_config.json").open("w", encoding="utf-8") as f:
     json.dump(cfg, f, indent=2, sort_keys=True)

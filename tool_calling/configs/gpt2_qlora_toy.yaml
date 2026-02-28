@@ -2,10 +2,10 @@ model_name: gpt2
 train_path: tool_calling/data/formatted/train.jsonl
 dev_path: tool_calling/data/formatted/dev.jsonl
 output_root: tool_calling/outputs/runs
-epochs: 1
+epochs: 3
 batch_size: 2
 learning_rate: 5.0e-5
-max_length: 512
+max_length: 384
 seed: 11711
 use_qlora: true
 lora:

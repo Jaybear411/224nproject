@@ -42,6 +42,7 @@ def main():
       f.write(json.dumps({
         "id": row["id"],
         "prompt": prompt,
+        "tool_schema": row["tool_schema"],
         "target_call": row["target_call"],
         "target_json": target,
       }, sort_keys=True) + "\n")
