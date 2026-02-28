@@ -45,7 +45,14 @@ def main():
   else:
     model = AutoModelForCausalLM.from_pretrained(args.ckpt)
 
-  model.config.pad_token_id = tokenizer.pad_token_id
+  pad_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
+  eos_id = tokenizer.eos_token_id
+  model.config.pad_token_id = pad_id
+  model.config.eos_token_id = eos_id
+  if hasattr(model, "generation_config"):
+    model.generation_config.pad_token_id = pad_id
+    model.generation_config.eos_token_id = eos_id
+
   model.eval()
   if torch.cuda.is_available():
     model = model.to("cuda")
@@ -59,7 +66,13 @@ def main():
       toks = tokenizer(prompt, return_tensors="pt")
       toks = {k: v.to(model.device) for k, v in toks.items()}
       with torch.no_grad():
-        gen = model.generate(**toks, max_new_tokens=args.max_new_tokens, do_sample=False)
+        gen = model.generate(
+          **toks,
+          max_new_tokens=args.max_new_tokens,
+          do_sample=False,
+          pad_token_id=pad_id,
+          eos_token_id=eos_id,
+        )
       prompt_len = toks["input_ids"].shape[1]
       generated_ids = gen[0][prompt_len:]
       output = tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
