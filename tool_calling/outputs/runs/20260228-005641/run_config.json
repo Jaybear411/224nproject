@@ -1,0 +1,17 @@
+{
+  "batch_size": 2,
+  "dev_path": "tool_calling/data/formatted/dev.jsonl",
+  "epochs": 3,
+  "learning_rate": 5e-05,
+  "lora": {
+    "alpha": 16,
+    "dropout": 0.05,
+    "r": 8
+  },
+  "max_length": 384,
+  "model_name": "gpt2",
+  "output_root": "tool_calling/outputs/runs",
+  "seed": 11711,
+  "train_path": "tool_calling/data/formatted/train.jsonl",
+  "use_qlora": true
+}
