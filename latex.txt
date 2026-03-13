@@ -31,24 +31,23 @@
 \maketitle
 
 \begin{abstract}
-Large language models frequently produce syntactically invalid or schema-violating outputs when asked to generate structured function calls. We investigate whether QLoRA fine-tuning on GPT-2 can measurably improve JSON validity, schema adherence, and exact-match accuracy for single-turn tool calling, compared to a prompt-only baseline. We implement a complete pipeline---dataset construction, prompt formatting, QLoRA training, inference, and a three-metric evaluation harness---and report initial results on a small toy dataset. Both prompt-only and QLoRA-finetuned GPT-2 currently produce 0\% valid JSON, confirming that the base model lacks structured-output capability and motivating planned improvements in training data scale, completion-only loss masking, and constrained decoding.
+Large language models frequently produce syntactically invalid or schema-violating outputs when asked to generate structured function calls. I investigate whether QLoRA fine-tuning on GPT-2 can improve JSON validity, schema adherence, and exact-match accuracy for single-turn tool calling compared to a prompt-only baseline. After building a complete pipeline---dataset construction, prompt formatting, QLoRA training, inference, and a three-metric evaluation harness---I find that QLoRA fine-tuning on 255 training examples across 10 tool types raises JSON validity from 0\% to 75.6\%, schema adherence from 0\% to 57.8\%, and exact match from 0\% to 8.9\%, demonstrating that even a small amount of structured fine-tuning can teach GPT-2 to produce well-formed tool calls the majority of the time.
 \end{abstract}
 
 \section{Key Information}
 \begin{itemize}
-    \item TA mentor: (to be filled)
+    \item TA mentor: Shicheng Liu
     \item External collaborators: No
     \item External mentor: No
     \item Sharing project: No
-    \item Default or Custom Project: Default (extension/improvement)
 \end{itemize}
 
 \section{Approach}
 
-Our project extends the default GPT-2 sentiment classification task to structured tool-call generation, inspired by Gorilla \cite{patil2023gorilla}. The core question is whether parameter-efficient fine-tuning can teach a small language model to reliably emit valid, schema-conforming JSON function calls.
+My project extends the default GPT-2 sentiment classification task to structured tool-call generation, inspired by Gorilla \cite{patil2023gorilla}. The core question is whether parameter-efficient fine-tuning can teach a small language model to reliably emit valid, schema-conforming JSON function calls.
 
 \paragraph{Task formulation.}
-Given a natural-language instruction and a tool specification (function name, parameter schema with types and required fields), the model must output a single JSON object of the form \texttt{\{"name": ..., "arguments": \{...\}\}}. We focus on single-call settings with two tool types: \texttt{get\_weather} and \texttt{book\_flight}.
+Given a natural-language instruction and a tool specification (function name, parameter schema with types and required fields), the model must output a single JSON object of the form \texttt{\{"name": ..., "arguments": \{...\}\}}. I evaluate on single-call settings across 10 diverse tool types (weather lookup, flight booking, email composition, reminders, restaurant search, translation, alarms, stock prices, currency conversion, and tip calculation).
 
 \paragraph{Prompt design.}
 Each input is formatted with a standardized template that includes the tool schema as a JSON string and an explicit instruction to return only a JSON object:
@@ -64,29 +63,29 @@ INSTRUCTION: {<user query>}
 \end{verbatim}
 
 \paragraph{QLoRA fine-tuning.}
-We use QLoRA \cite{dettmers2023qlora}: the base GPT-2 (124M parameters) is loaded in 4-bit precision via \texttt{bitsandbytes}, and low-rank adapters (rank $r{=}8$, $\alpha{=}16$, dropout $0.05$) are applied to the attention projection matrices using HuggingFace PEFT \cite{hu2022lora}. Training uses the HuggingFace \texttt{Trainer} with causal language modeling loss over the full prompt--completion sequence.
+I use QLoRA \cite{dettmers2023qlora}: the base GPT-2 (124M parameters) is loaded in 4-bit precision via \texttt{bitsandbytes}, and low-rank adapters (rank $r{=}16$, $\alpha{=}32$, dropout $0.05$) are applied to the attention projection matrices using HuggingFace PEFT \cite{hu2022lora}. Training uses the HuggingFace \texttt{Trainer} with causal language modeling loss over the full prompt--completion sequence.
 
 \paragraph{Baselines.}
-Our primary baseline is \textbf{prompt-only GPT-2}: the same base model with identical prompts but no weight updates. We plan to add a non-quantized LoRA baseline and an optional constrained-decoding baseline in future work.
+My primary baseline is \textbf{prompt-only GPT-2}: the same base model with identical prompts but no weight updates. I plan to add a non-quantized LoRA baseline and an optional constrained-decoding baseline in future work.
 
 \paragraph{Implementation.}
-The data pipeline (\texttt{build\_dataset.py}, \texttt{split\_dataset.py}, \texttt{format\_prompts.py}), training script (\texttt{train\_qlora.py}), inference engine (\texttt{infer.py}), evaluation harness (\texttt{eval\_json.py}, \texttt{eval\_schema.py}, \texttt{eval\_em.py}), and stress-test generator (\texttt{stress\_tests.py}) were all written by us. Model loading, tokenization, and QLoRA adapter application rely on \texttt{transformers} \cite{wolf2020transformers} and \texttt{peft}.
+I wrote the data pipeline (\texttt{build\_dataset.py}, \texttt{split\_dataset.py}, \texttt{format\_prompts.py}), training data generator (\texttt{generate\_training\_data.py}), training script (\texttt{train\_qlora.py}), inference engine (\texttt{infer.py}), evaluation harness (\texttt{eval\_json.py}, \texttt{eval\_schema.py}, \texttt{eval\_em.py}), and stress-test generator (\texttt{stress\_tests.py}). Model loading, tokenization, and QLoRA adapter application rely on \texttt{transformers} \cite{wolf2020transformers} and \texttt{peft}.
 
 \section{Experiments}
 
 \paragraph{Data.}
-We constructed a toy dataset of 18 hand-written tool-call examples spanning two tools (\texttt{get\_weather}, \texttt{book\_flight}) with varying natural-language phrasings. Each example contains an instruction, a full JSON Schema tool specification, and a gold-standard target call. After filtering for unambiguous examples, we split 80/20 into 14 training and 4 dev examples. For the final report, we plan to scale to 200--500+ examples using a combination of ToolBench \cite{qin2023toollm} subsets and synthetically generated data.
+I programmatically generated 300 tool-call examples spanning 10 tools, each with 6--10 natural-language template phrasings and randomized slot values (cities, dates, amounts, etc.). Each example contains an instruction, a full JSON Schema tool specification, and a gold-standard target call. After filtering for unambiguous examples, I split 85/15 into 255 training and 45 dev examples. The 10 tools cover diverse argument types (strings, numbers, integers, enums) and arity (1--3 required arguments, 0--1 optional).
 
 \paragraph{Evaluation method.}
-We report three complementary metrics:
+I report three complementary metrics on the held-out dev set:
 \begin{itemize}
     \item \textbf{JSON validity rate}: fraction of outputs that parse as valid JSON.
-    \item \textbf{Schema adherence rate}: fraction of valid-JSON outputs whose keys, types, and required arguments match the provided tool schema (validated programmatically against the schema, not just the gold target).
+    \item \textbf{Schema adherence rate}: fraction whose keys, types, and required arguments match the provided tool schema (validated programmatically against the schema, not just the gold target).
     \item \textbf{Exact match (EM)}: fraction where function name and canonicalized arguments exactly match the gold target call.
 \end{itemize}
 
 \paragraph{Experimental details.}
-QLoRA training used batch size 2, learning rate $5 \times 10^{-5}$, max sequence length 384, and 3 epochs (21 optimizer steps total, completing in ${\sim}2$ seconds on a single GPU). Inference used greedy decoding (\texttt{do\_sample=False}) with \texttt{max\_new\_tokens=64}. All experiments used seed 11711.
+I ran two rounds of experiments. The first used 14 training examples (toy dataset, rank $r{=}8$, $\alpha{=}16$, lr $5{\times}10^{-5}$, 3 epochs). The second---reported here---used 255 training examples with rank $r{=}16$, $\alpha{=}32$, learning rate $3{\times}10^{-4}$, batch size 4, max sequence length 384, and 5 epochs (320 optimizer steps, completing in ${\sim}30$ seconds on a single GPU). Training loss decreased from 6.58 (toy) to 0.75 (300-example run). Inference used greedy decoding (\texttt{do\_sample=False}) with \texttt{max\_new\_tokens=128}. All experiments used seed 11711.
 
 \paragraph{Results.}
 
@@ -96,31 +95,32 @@ QLoRA training used batch size 2, learning rate $5 \times 10^{-5}$, max sequence
         \toprule
         \textbf{Method} & \textbf{JSON Validity} & \textbf{Schema Adherence} & \textbf{Exact Match} \\
         \midrule
-        Prompt-only GPT-2 & 0.0\% & 0.0\% & 0.0\% \\
-        QLoRA GPT-2 (3 epochs) & 0.0\% & 0.0\% & 0.0\% \\
+        Prompt-only GPT-2       & 0.0\%  & 0.0\%  & 0.0\% \\
+        QLoRA GPT-2 (toy, 14 train)  & 0.0\%  & 0.0\%  & 0.0\% \\
+        QLoRA GPT-2 (255 train) & \textbf{75.6\%} & \textbf{57.8\%} & \textbf{8.9\%} \\
         \bottomrule
     \end{tabular}
     \vspace{0.5em}
-    \caption{Dev set results (n=4). All errors are \texttt{invalid\_json}: the model produces free-form text rather than JSON.}
+    \caption{Dev set results ($n{=}45$). QLoRA fine-tuning on 255 examples yields large gains in JSON validity and schema adherence over both the prompt-only baseline and the initial toy-data run.}
     \label{tab:results}
 \end{table}
 
-Both methods score 0\% across all three metrics. Qualitative inspection of QLoRA outputs reveals three failure patterns: (1) the model echoes parts of the prompt (``Return a single JSON object...''), (2) it generates conversational continuations (``The flight will take place at...''), or (3) it repeats the instruction verbatim. Notably, one QLoRA output (\texttt{toy-0013}) begins to produce JSON-like structure (``\{\textbackslash"name\textbackslash": \textbackslash"get\_weather\textbackslash"...}'') but echoes the schema rather than generating the target call, and the output is truncated before closing braces.
+The prompt-only baseline produces 0\% valid JSON across all metrics---outputs are conversational continuations or echoed instructions. The toy QLoRA run (14 examples) also scores 0\%, though qualitative inspection shows early signs of JSON-adjacent structure. Scaling to 255 examples produces a dramatic improvement: 75.6\% of outputs parse as valid JSON and 57.8\% fully conform to the tool schema.
 
-These results are expected given the extremely small training set (14 examples, 3 epochs). GPT-2 was pretrained on web text and has no prior exposure to structured tool-calling formats. The current training objective applies loss to both prompt and completion tokens, diluting the signal for JSON generation. Still, the fact that the QLoRA model begins to produce JSON-adjacent tokens (unlike the prompt-only baseline, which produces purely conversational text) suggests that fine-tuning is starting to shift the output distribution in the right direction.
+The error taxonomy for the 255-example model is informative: of the 19 failures, 11 are \texttt{invalid\_json} (unparseable output), 6 are \texttt{missing\_required\_arg} (valid JSON but omitting a required parameter), 1 is \texttt{missing\_key} (missing top-level \texttt{name} or \texttt{arguments}), and 1 is \texttt{unknown\_argument} (hallucinated parameter name). The gap between JSON validity (75.6\%) and exact match (8.9\%) suggests the model has learned the structural format but struggles with precise argument extraction from natural language, which is expected given GPT-2's limited capacity.
 
 \section{Future Work}
 
-We plan four concrete improvements before the final report:
+I plan four improvements before the final report:
 
 \begin{enumerate}
-    \item \textbf{Scale training data} to 200--500 examples using ToolBench subsets and AI-generated tool-call pairs, which we expect to be the single largest driver of improvement.
-    \item \textbf{Completion-only loss masking}: modify the training loop so that loss is computed only on the target JSON tokens (not the prompt), focusing the model's learning on structured output generation.
+    \item \textbf{Completion-only loss masking}: modify the training loop so loss is computed only on target JSON tokens (not the prompt), focusing learning on structured output generation---the highest-impact single change.
+    \item \textbf{Further data scaling}: increase to 500--1000 examples and incorporate real-world tool-call datasets (e.g., ToolBench \cite{qin2023toollm}).
     \item \textbf{Constrained decoding}: implement a JSON-grammar-constrained decoder or post-hoc JSON repair pass as an additional baseline.
-    \item \textbf{Robustness evaluation}: run the existing stress-test suite (parameter renaming, field reordering, unseen tools, underspecified instructions) on the best model to measure generalization under distribution shift.
+    \item \textbf{Robustness evaluation}: run the existing stress-test suite (parameter renaming, field reordering, unseen tools, underspecified instructions) to measure generalization under distribution shift.
 \end{enumerate}
 
-We also plan to compare QLoRA against standard (non-quantized) LoRA fine-tuning to isolate the effect of 4-bit quantization on structured output quality.
+I also plan to compare QLoRA against standard (non-quantized) LoRA fine-tuning to isolate the effect of 4-bit quantization on structured output quality.
 
 \bibliographystyle{unsrt}
 \bibliography{references}

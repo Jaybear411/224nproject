@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 '''
-Trains and evaluates GPT2SentimentClassifier on SST and CFIMDB
+Sentiment classification with GPT-2 on SST and CFIMDB.
 '''
 
 import random, numpy as np, argparse
@@ -33,19 +33,13 @@ def seed_everything(seed=11711):
 
 
 class GPT2SentimentClassifier(torch.nn.Module):
-  '''
-  This module performs sentiment classification using GPT2 in a cloze-style (fill-in-the-blank) task.
-
-  In the SST dataset, there are 5 sentiment categories (from 0 - "negative" to 4 - "positive").
-  Thus, your forward() should return one logit for each of the 5 classes.
-  '''
+  '''GPT-2 + linear head for sentiment classification (SST has 5 classes, CFIMDB is binary).'''
 
   def __init__(self, config):
     super(GPT2SentimentClassifier, self).__init__()
     self.num_labels = config.num_labels
     self.gpt = GPT2Model.from_pretrained()
 
-    # Pretrain mode does not require updating GPT paramters.
     assert config.fine_tune_mode in ["last-linear-layer", "full-model"]
     for param in self.gpt.parameters():
       if config.fine_tune_mode == 'last-linear-layer':
@@ -53,17 +47,12 @@ class GPT2SentimentClassifier(torch.nn.Module):
       elif config.fine_tune_mode == 'full-model':
         param.requires_grad = True
 
-    ### TODO: Create any instance variables you need to classify the sentiment of BERT embeddings.
     self.dropout = torch.nn.Dropout(config.hidden_dropout_prob)
     self.classifier = torch.nn.Linear(config.hidden_size, self.num_labels)
 
 
   def forward(self, input_ids, attention_mask):
-    '''Takes a batch of sentences and returns logits for sentiment classes'''
-
-    ### TODO: The final GPT contextualized embedding is the hidden state of the last token.
-    ###       HINT: You should consider what is an appropriate return value given that
-    ###       the training loop currently uses F.cross_entropy as the loss function.
+    '''last token embedding -> dropout -> classify'''
     gpt_outputs = self.gpt(input_ids=input_ids, attention_mask=attention_mask)
     last_token = gpt_outputs['last_token']
     last_token = self.dropout(last_token)

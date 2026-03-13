@@ -1,10 +1,7 @@
 # !/usr/bin/env python3
 
 """
-Evaluation code for Quora paraphrase detection.
-
-model_eval_paraphrase is suitable for the dev (and train) dataloaders where the label information is available.
-model_test_paraphrase is suitable for the test dataloader where label information is not available.
+Eval helpers for paraphrase detection and sonnet generation.
 """
 
 import torch

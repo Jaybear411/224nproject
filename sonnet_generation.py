@@ -42,7 +42,7 @@ def seed_everything(seed=11711):
 
 
 class SonnetGPT(nn.Module):
-  """Your GPT-2 Model designed for paraphrase detection."""
+  """GPT-2 fine-tuned to generate sonnets. basically a language model."""
 
   def __init__(self, args):
     super().__init__()
@@ -50,16 +50,12 @@ class SonnetGPT(nn.Module):
     self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
     self.tokenizer.pad_token = self.tokenizer.eos_token
 
-    # By default, fine-tune the full model. TODO: this is maybe not idea.
+    # fine-tune everything, might wanna freeze some layers later idk
     for param in self.gpt.parameters():
       param.requires_grad = True
 
   def forward(self, input_ids, attention_mask):
-    """
-    This is similar to the forward for ParaphraseGPT, but we now want to produce a logit for each token in our sequence;
-    not just the last token! This will allow our model to learn the natural language distribution that composes sonnets,
-    not just the distribution over next tokens for the last token!
-    """
+    """get logits for every position (not just last token) so we can do LM training."""
     gpt_outputs = self.gpt(input_ids=input_ids, attention_mask=attention_mask)
     hidden_states = gpt_outputs['last_hidden_state']
     return self.gpt.hidden_state_to_token(hidden_states)
@@ -71,13 +67,7 @@ class SonnetGPT(nn.Module):
 
   @torch.no_grad()
   def generate(self, encoding, temperature=0.7, top_p=0.9, max_length=128):
-    """
-    Generates an original sonnet using top-p sampling and softmax temperature.
-
-    TODO: this is probably not ideal. You can look at hugging face's model.generate(...) function for inspiration.
-    In particular, generating multiple sequences and choosing the best with beam search is one avenue. Top_k is another;
-    there are many.
-    """
+    """top-p sampling with temperature. could try beam search or top-k too."""
     token_ids = encoding.to(self.get_device())
     attention_mask = torch.ones(token_ids.shape, dtype=torch.int64).to(self.get_device())
 
@@ -132,7 +122,7 @@ def save_model(model, optimizer, args, filepath):
 
 
 def train(args):
-  """Train GPT-2 for paraphrase detection on the Quora dataset."""
+  """Train GPT-2 as a language model on sonnets."""
   device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
   # Create the data and its corresponding datasets and dataloader.
   sonnet_dataset = SonnetsDataset(args.sonnet_path)
@@ -182,7 +172,7 @@ def train(args):
       output = model.generate(encoding['input_ids'], temperature=args.temperature, top_p=args.top_p)
       print(f'{batch[1]}{output[1]}\n\n')
 
-    # TODO: consider a stopping condition to prevent overfitting on the small dataset of sonnets.
+    # maybe add early stopping? sonnet dataset is pretty small
     save_model(model, optimizer, args, f'{epoch}_{args.filepath}')
 
 
@@ -243,21 +233,17 @@ def get_args():
 
 
 def add_arguments(args):
-  """Add arguments that are deterministic on model size."""
-  if args.model_size == 'gpt2':
-    args.d = 768
-    args.l = 12
-    args.num_heads = 12
-  elif args.model_size == 'gpt2-medium':
-    args.d = 1024
-    args.l = 24
-    args.num_heads = 16
-  elif args.model_size == 'gpt2-large':
-    args.d = 1280
-    args.l = 36
-    args.num_heads = 20
-  else:
+  """Set hidden dim / layers / heads based on model size."""
+  model_configs = {
+    'gpt2':        {'d': 768,  'l': 12, 'num_heads': 12},
+    'gpt2-medium': {'d': 1024, 'l': 24, 'num_heads': 16},
+    'gpt2-large':  {'d': 1280, 'l': 36, 'num_heads': 20},
+    'gpt2-xl':     {'d': 1600, 'l': 48, 'num_heads': 25},
+  }
+  if args.model_size not in model_configs:
     raise Exception(f'{args.model_size} is not supported.')
+  for k, v in model_configs[args.model_size].items():
+    setattr(args, k, v)
   return args
 
 
